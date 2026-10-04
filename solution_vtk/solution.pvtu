@@ -1,0 +1,34 @@
+<?xml version="1.0"?>
+<VTKFile type="PUnstructuredGrid" version="0.1" byte_order="LittleEndian">
+  <PUnstructuredGrid GhostLevel="0">
+    <PPointData Scalars="u">
+      <PDataArray
+          type="Float64"
+          Name="u"
+          NumberOfComponents="1"/>
+    </PPointData>
+    <PCellData>
+    </PCellData>
+    <PPoints>
+      <PDataArray
+          type="Float64"
+          NumberOfComponents="3"/>
+    </PPoints>
+    <Piece Source="solution_0.vtu"/>
+    <Piece Source="solution_1.vtu"/>
+    <Piece Source="solution_2.vtu"/>
+    <Piece Source="solution_3.vtu"/>
+    <Piece Source="solution_4.vtu"/>
+    <Piece Source="solution_5.vtu"/>
+    <Piece Source="solution_6.vtu"/>
+    <Piece Source="solution_7.vtu"/>
+    <Piece Source="solution_8.vtu"/>
+    <Piece Source="solution_9.vtu"/>
+    <Piece Source="solution_10.vtu"/>
+    <Piece Source="solution_11.vtu"/>
+    <Piece Source="solution_12.vtu"/>
+    <Piece Source="solution_13.vtu"/>
+    <Piece Source="solution_14.vtu"/>
+    <Piece Source="solution_15.vtu"/>
+  </PUnstructuredGrid>
+</VTKFile>
