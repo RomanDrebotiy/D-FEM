@@ -26,3 +26,13 @@ mpicxx main.cpp fem/distributed_synced_ops.cpp fem/local.cpp fem/mpi_iface_sync.
 ```bash
 mpirun --host node01:4,node02:6,node03:6 -np 16 d_fem
 ```
+
+# Notes
+
+Library is created for educational purposes, it is not polished and can contain bugs.
+
+**Written without code generation by AI tools.**
+
+*Copyright (c) 2026 Roman Drebotiy*
+
+*Licensed under the Apache License 2.0 (see LICENSE file)*
