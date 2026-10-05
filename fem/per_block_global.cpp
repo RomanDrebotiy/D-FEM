@@ -8,13 +8,13 @@
 
 // Here we manage per-block parts of global system without any MPI sync. Syncing we will do in other file.
 
-void sort(std::array<std::pair<int, double>, 6>& arr) {
+void sort(std::array<std::pair<int, double>, 7>& arr) {
     std::sort(arr.begin(), arr.end());
 }
 
-std::vector<std::pair<int, double>> col_vals(std::array<std::pair<int, double>, 6>& arr) {
+std::vector<std::pair<int, double>> col_vals(std::array<std::pair<int, double>, 7>& arr) {
     std::vector<std::pair<int, double>> res;
-    for (int i = 0; i < 6; i++) {
+    for (size_t i = 0; i < arr.size(); i++) {
         if (arr[i].first != -1) {
             res.push_back(arr[i]);
         }
@@ -22,7 +22,7 @@ std::vector<std::pair<int, double>> col_vals(std::array<std::pair<int, double>, 
     return res;
 }
 
-bool add_el(std::array<std::pair<int, double>, 6>& arr, int ind, double val) {
+bool add_el(std::array<std::pair<int, double>, 7>& arr, int ind, double val) {
     for (size_t i = 0; i < arr.size(); i++) {
         if (arr[i].first == -1) {
             arr[i].first = ind;
@@ -39,8 +39,8 @@ bool add_el(std::array<std::pair<int, double>, 6>& arr, int ind, double val) {
 }
 
 struct TempGlobalMatr {
-    // each entry corresponds to the row and stores unsorted pairs (col, val). Not greater than 6 for the regular mesh.
-    std::vector<std::array<std::pair<int, double>, 6>> matr;
+    // each entry corresponds to the row and stores unsorted pairs (col, val). Not greater than 7 for the regular mesh.
+    std::vector<std::array<std::pair<int, double>, 7>> matr;
 
     TempGlobalMatr(int n) : matr(n) {
         for (auto& row : matr) {
