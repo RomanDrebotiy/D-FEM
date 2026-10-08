@@ -63,7 +63,8 @@ BlockMesh distribute_and_build_mesh(int rank, int size, int num_seg_per_block) {
     bm.generate_mesh(start_ind_for_internal_nodes + num_internal_pts_per_block * (rank - 1));
     bm.assign_local_idx();
 
-    // We return full object copy since here it will be lightweight and only large piece is the interface, which is already allocated dynamically
-    // (!) But there is an issue with dangling pointers here :) So is the task for students...
+    // (!) We return full object copy here, which is bad... need to rework...
+    // (!) But there is also an issue with dangling pointers here which is not always reproducable :)
+    // (!) ... so we have 2 tasks for students...
     return bm;
 }
