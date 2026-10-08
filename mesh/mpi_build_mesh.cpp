@@ -64,7 +64,7 @@ BlockMesh distribute_and_build_mesh(int rank, int size, int num_seg_per_block) {
     bm.assign_local_idx();
 
     // (!) We return full object copy here, which is bad... need to rework...
-    // (!) But there is also an issue with dangling pointers here which is not always reproducable :)
+    // (!) But there is also an issue with dangling pointers here which is not always reproducible :)
     // (!) ... so we have 2 tasks for students...
     return bm;
 }
