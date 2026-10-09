@@ -18,13 +18,21 @@ Provided code demonstrates the following:
 ## compile
 
 ```bash
-mpicxx main.cpp fem/distributed_synced_ops.cpp fem/local.cpp fem/mpi_iface_sync.cpp fem/per_block_global.cpp mesh/geometry.cpp mesh/geometry_serializer.cpp mesh/mpi_build_mesh.cpp solver/pcg.cpp vtk/writer.cpp -lm -o d_fem
+mpicxx main.cpp fem/distributed_synced_ops.cpp fem/local.cpp fem/mpi_iface_sync.cpp fem/per_block_global.cpp mesh/geometry.cpp mesh/geometry_serializer.cpp mesh/mpi_build_mesh.cpp solver/pcg.cpp vtk/writer.cpp -lm -lOpenCL -o d_fem
 ```
 
 ## run
 
+Without OpenCL usage:
+
 ```bash
 mpirun --host node01:4,node02:6,node03:6 -np 16 d_fem
+```
+
+With OpenCL usage for sparse matrix-vector product:
+
+```bash
+mpirun --host node01:4,node02:6,node03:6 -np 16 d_fem --ocl
 ```
 
 # Notes

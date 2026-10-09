@@ -1,6 +1,7 @@
 #include <mpi.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <string>
 
 #include "mesh/mpi_build_mesh.h"
 #include "mesh/geometry.h"
@@ -9,7 +10,15 @@
 #include "vtk/writer.h"
 
 int main(int argc, char **argv)
-{
+{   
+    for (int i = 1; i < argc; ++i) {
+        std::string arg = argv[i];
+        if (arg == "--ocl") {
+            USE_OPENCL = true;
+            break;
+        }
+    }
+
     int rank, size;
     char hostname[256];
 
@@ -39,7 +48,7 @@ int main(int argc, char **argv)
 
     printf("Started MPI rank %d of %d on %s\n", rank, size, hostname);
 
-    int num_seg_per_block = 50;
+    int num_seg_per_block = 1000;
 
     int num_dofs_per_dim = number_blocks_per_dim(size) * num_seg_per_block + 1;
     int num_dofs = num_dofs_per_dim * num_dofs_per_dim;
@@ -60,6 +69,13 @@ int main(int argc, char **argv)
 
     start = MPI_Wtime();
     GlobalSystem gs = assemble(bm);
+
+    if (USE_OPENCL) {
+        if (rank == 0) {
+            printf("Using OpenCL\n");
+        }
+        init_opencl(gs.matr);
+    }
 
     MPI_Barrier(MPI_COMM_WORLD);
     if (rank == 0) {

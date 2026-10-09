@@ -6,7 +6,121 @@
 #include <array>
 #include <algorithm>
 
+#include <mpi.h>
+#include <CL/cl.h>
+
+#include <fstream>
+#include <iostream>
+#include <sstream>
+#include <stdexcept>
+#include <string>
+
 // Here we manage per-block parts of global system without any MPI sync. Syncing we will do in other file.
+
+bool USE_OPENCL = false;
+
+static cl_context opencl_context = nullptr;
+static cl_command_queue opencl_queue = nullptr;
+static cl_program opencl_program = nullptr;
+static cl_kernel opencl_kernel = nullptr;
+
+static cl_mem opencl_row_idx = nullptr;
+static cl_mem opencl_col_idx = nullptr;
+static cl_mem opencl_vals = nullptr;
+
+static cl_mem opencl_x_buffer = nullptr;
+static cl_mem opencl_y_buffer = nullptr;
+
+static int opencl_matrix_size = 0;
+
+void init_opencl(GlobalMatrix& m) {
+    cl_int err;
+    opencl_matrix_size = m.get_size();
+    cl_platform_id platform = nullptr;
+    err = clGetPlatformIDs(1, &platform, nullptr);
+    if (err != CL_SUCCESS) {
+        throw std::runtime_error("OpenCL: failed to find platform");
+    }
+
+    cl_device_id device = nullptr;
+    err = clGetDeviceIDs(platform, CL_DEVICE_TYPE_GPU, 1, &device, nullptr);
+    if (err != CL_SUCCESS) {
+        throw std::runtime_error("OpenCL: failed to find GPU");
+    }
+
+    opencl_context = clCreateContext(nullptr, 1, &device, nullptr, nullptr, &err);
+    if (err != CL_SUCCESS) {
+        throw std::runtime_error("OpenCL: failed to create context");
+    }
+
+    opencl_queue = clCreateCommandQueue(opencl_context, device, 0, &err);
+    if (err != CL_SUCCESS) {
+        throw std::runtime_error("OpenCL: failed to create command queue");
+    }
+
+    std::ifstream file("fem/spmv.cl");
+    if (!file) {
+        throw std::runtime_error("OpenCL: cannot open fem/spmv.cl");
+    }
+
+    std::stringstream buffer;
+    buffer << file.rdbuf();
+    std::string source = buffer.str();
+    const char* source_ptr = source.c_str();
+    size_t source_size = source.size();
+
+    opencl_program = clCreateProgramWithSource(opencl_context, 1, &source_ptr, &source_size, &err);
+    if (err != CL_SUCCESS) {
+        throw std::runtime_error("OpenCL: failed to create program");
+    }
+
+    err = clBuildProgram(opencl_program, 1, &device, nullptr, nullptr, nullptr);
+    if (err != CL_SUCCESS) {
+        size_t log_size = 0;
+        clGetProgramBuildInfo(opencl_program, device, CL_PROGRAM_BUILD_LOG, 0, nullptr, &log_size);
+
+        std::string log(log_size, '\0');
+        clGetProgramBuildInfo(opencl_program, device, CL_PROGRAM_BUILD_LOG,  log_size, log.data(), nullptr);
+
+        std::cerr << "OpenCL compilation error:\n" << log << std::endl;
+
+        throw std::runtime_error("OpenCL: failed to build program");
+    }
+
+    opencl_kernel = clCreateKernel(opencl_program, "csr_spmv", &err);
+    if (err != CL_SUCCESS) {
+        throw std::runtime_error("OpenCL: failed to create kernel");
+    }
+
+    opencl_row_idx = clCreateBuffer(opencl_context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, m.row_idx.size() * sizeof(int), m.row_idx.data(), &err);
+    if (err != CL_SUCCESS) {
+        throw std::runtime_error(
+            "OpenCL: failed to create row_idx buffer");
+    }
+
+    opencl_col_idx = clCreateBuffer(opencl_context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, m.col_idx.size() * sizeof(int), m.col_idx.data(), &err);
+    if (err != CL_SUCCESS) {
+        throw std::runtime_error("OpenCL: failed to create col_idx buffer");
+    }
+
+    opencl_vals = clCreateBuffer(opencl_context, CL_MEM_READ_ONLY | CL_MEM_COPY_HOST_PTR, m.vals.size() * sizeof(double), m.vals.data(),  &err);
+    if (err != CL_SUCCESS) {
+        throw std::runtime_error("OpenCL: failed to create vals buffer");
+    }
+
+    opencl_x_buffer = clCreateBuffer(opencl_context, CL_MEM_READ_ONLY, m.get_size() * sizeof(double), nullptr, &err);
+    if (err != CL_SUCCESS) {
+        throw std::runtime_error("Failed to create x buffer");
+    }
+
+    opencl_y_buffer = clCreateBuffer(opencl_context, CL_MEM_WRITE_ONLY, m.get_size() * sizeof(double), nullptr, &err);
+
+    if (err != CL_SUCCESS) {
+        throw std::runtime_error("Failed to create y buffer");
+    }
+
+    std::cout << "OpenCL initialized successfully\n";
+}
 
 void sort(std::array<std::pair<int, double>, 7>& arr) {
     std::sort(arr.begin(), arr.end());
@@ -120,7 +234,7 @@ GlobalVector gmv(GlobalMatrix& m, GlobalVector& v) {
     return res;
 }
 
-void gmv_dest(GlobalMatrix& m, GlobalVector& v, GlobalVector& res) {
+void gmv_dest_cpu(GlobalMatrix& m, GlobalVector& v, GlobalVector& res) {
     for (int i = 0; i < m.get_size(); i++) {
         res.vals[i] = 0;
         for (int j = m.row_idx[i]; j < m.row_idx[i+1]; j++) {
@@ -128,6 +242,69 @@ void gmv_dest(GlobalMatrix& m, GlobalVector& v, GlobalVector& res) {
         }
     }
     res.iface_boundaries = v.iface_boundaries;
+}
+
+void gmv_dest_opencl(GlobalVector& v, GlobalVector& res) {
+    cl_int err;
+    const size_t n = static_cast<size_t>(opencl_matrix_size);
+    const size_t bytes = n * sizeof(double);
+
+
+    err = clEnqueueWriteBuffer(opencl_queue, opencl_x_buffer, CL_TRUE, 0, bytes, v.vals.data(), 0, nullptr, nullptr);
+    if (err != CL_SUCCESS) {
+        throw std::runtime_error("Failed to upload x vector");
+    }
+
+    err = clSetKernelArg(opencl_kernel, 0, sizeof(cl_mem), &opencl_row_idx);
+    if (err != CL_SUCCESS) {
+        throw std::runtime_error("Failed to set row_idx argument");
+    }
+
+    err = clSetKernelArg(opencl_kernel, 1, sizeof(cl_mem), &opencl_col_idx);
+    if (err != CL_SUCCESS) {
+        throw std::runtime_error("Failed to set col_idx argument");
+    }
+
+    err = clSetKernelArg(opencl_kernel, 2, sizeof(cl_mem), &opencl_vals);
+    if (err != CL_SUCCESS) {
+        throw std::runtime_error("Failed to set vals argument");
+    }
+
+    err = clSetKernelArg(opencl_kernel, 3, sizeof(cl_mem), &opencl_x_buffer);
+    if (err != CL_SUCCESS) {
+        throw std::runtime_error("Failed to set x argument");
+    }
+
+    err = clSetKernelArg(opencl_kernel, 4, sizeof(cl_mem), &opencl_y_buffer);
+    if (err != CL_SUCCESS) {
+        throw std::runtime_error("Failed to set y argument");
+    }
+
+    const size_t global_size = n;
+    err = clEnqueueNDRangeKernel(opencl_queue, opencl_kernel, 1, nullptr, &global_size, nullptr, 0, nullptr, nullptr);
+    if (err != CL_SUCCESS) {
+        throw std::runtime_error("Failed to launch SpMV kernel");
+    }
+
+    err = clEnqueueReadBuffer(opencl_queue, opencl_y_buffer, CL_TRUE, 0, bytes, res.vals.data(), 0, nullptr, nullptr);
+    if (err != CL_SUCCESS) {
+        throw std::runtime_error("Failed to download y vector");
+    }
+
+    res.iface_boundaries = v.iface_boundaries;
+}
+
+void gmv_dest(GlobalMatrix& m, GlobalVector& v, GlobalVector& res) {
+    double start = MPI_Wtime();
+
+    if (USE_OPENCL) {
+        gmv_dest_opencl(v, res);
+    } else {
+        gmv_dest_cpu(m, v, res);
+    }
+
+    double elapsed = MPI_Wtime() - start;
+    printf("TIME >> GMV %.6f\n", elapsed);
 }
 
 GlobalVector addv(GlobalVector& v, GlobalVector& w) {

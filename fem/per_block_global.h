@@ -4,6 +4,8 @@
 #include <vector>
 #include <cmath>
 
+extern bool USE_OPENCL;
+
 struct GlobalVector {
     std::vector<double> vals;
     std::array<int, 5> iface_boundaries;
@@ -77,6 +79,8 @@ struct GlobalSystem {
         return vec.get_size();
     }
 };
+
+void init_opencl(GlobalMatrix& m);
 
 GlobalSystem assemble(BlockMesh& bm);
 
