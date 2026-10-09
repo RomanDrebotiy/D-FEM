@@ -249,7 +249,6 @@ void gmv_dest_opencl(GlobalVector& v, GlobalVector& res) {
     const size_t n = static_cast<size_t>(opencl_matrix_size);
     const size_t bytes = n * sizeof(double);
 
-
     err = clEnqueueWriteBuffer(opencl_queue, opencl_x_buffer, CL_TRUE, 0, bytes, v.vals.data(), 0, nullptr, nullptr);
     if (err != CL_SUCCESS) {
         throw std::runtime_error("Failed to upload x vector");
