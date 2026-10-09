@@ -9,6 +9,7 @@ Provided code demonstrates the following:
   - distributed sparse matrix, stored in a CSR format;
   - distributed vector with interface synchronization across cluster nodes;
 - distributed FEM linear system assembly;
+- sparse matrix-vector product computation on node's GPU using OpenCL;
 - parallel implementation of the conjugate gradient method;
 - Jacobi diagonal preconditioner;
 - VTK files generation for obtained solution.
